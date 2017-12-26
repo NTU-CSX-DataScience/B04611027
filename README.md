@@ -3,7 +3,7 @@
 
 ●作業二 ggplot2繪圖呈現：https://github.com/NTU-CSX-DataScience/B04611027/blob/master/0927.html
 
-●作業三 文字雲：https://github.com/NTU-CSX-DataScience/B04611027/blob/master/hw3.html
+●作業三 文字雲：https://ntu-csx-datascience.github.io/B04611027/hw3.html
 
 ●作業四 TF-IDF & KMeans：
 
