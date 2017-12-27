@@ -1,0 +1,152 @@
+---
+title: "hw4"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## 匯入library
+```{r echo=TRUE,warning=FALSE}
+library(httr)
+library(rjson)
+library(httpuv)
+library(Rfacebook, warn.conflicts = FALSE)
+library(plyr)
+library(NLP, warn.conflicts = FALSE)
+library(tm)
+library(xml2)
+library(rvest, warn.conflicts = FALSE)
+library(SnowballC)
+library(slam)
+library(Matrix)
+library(jiebaRD)
+library(jiebaR)
+library(RColorBrewer)
+library(plotly)
+```
+## 在facebook做文本的抓取與字詞清理 找到一些特別的用語並將其加入
+```{r pressure, echo=TRUE,warning=FALSE}
+token <- "EAACEdEose0cBAFOQiLAJBtv5cPEPH8q04LEXSai354iYbY8YZCNZBryxXZB38JLrmZChtxMRhjIcgnKr9YaSuTKjW9xBnuRtVnnseBjJukgToLHXzI538b7NPWihF85pEPck6OJjZBYCOuIKSc1FfWf480y3hw5SWkQGmoh5tEurjstLxFmlWkjd34lfFDR9PPS19RBE4ri9I7Jvx7FNR" 
+page.id <- "1431308506880067" 
+page <- getPage(page.id, token, n = 150)
+docs = Corpus(VectorSource(as.character(page[,3])))
+toSpace = content_transformer(function(x,pattern){
+  return (gsub(pattern," ",x))
+})
+docs <- tm_map(docs, toSpace, "※")
+docs <- tm_map(docs, toSpace, "◆")
+docs <- tm_map(docs, toSpace, "‧")
+docs <- tm_map(docs, toSpace, "的")
+docs <- tm_map(docs, toSpace, "我")
+docs <- tm_map(docs, toSpace, "也")
+docs <- tm_map(docs, toSpace, "他")
+docs <- tm_map(docs, toSpace, "是")
+docs <- tm_map(docs, toSpace, "就")
+docs <- tm_map(docs, toSpace, "你")
+docs <- tm_map(docs, toSpace, "啊")
+docs <- tm_map(docs, toSpace, "嗎")
+docs <- tm_map(docs, toSpace, "啦")
+docs <- tm_map(docs, toSpace, "要")
+docs <- tm_map(docs, toSpace, "有")
+docs <- tm_map(docs, toSpace, "及")
+docs <- tm_map(docs, toSpace, "了")
+docs <- tm_map(docs, toSpace, "在")
+docs <- tm_map(docs, toSpace, "但")
+docs <- tm_map(docs, toSpace, "都")
+docs <- tm_map(docs, toSpace, "哈")
+docs <- tm_map(docs, toSpace, "不")
+docs <- tm_map(docs, toSpace, "與")
+docs <- tm_map(docs, toSpace, "什麼")
+docs <- tm_map(docs, toSpace, "一個")
+docs <- tm_map(docs, toSpace, "們")
+docs <- tm_map(docs, toSpace, "這")
+docs <- tm_map(docs, removePunctuation)
+docs <- tm_map(docs, removeNumbers)
+docs <- tm_map(docs, toSpace, "[a-zA-Z]")
+docs <- tm_map(docs, removePunctuation)
+docs <- tm_map(docs, removeNumbers)
+docs <- tm_map(docs, stripWhitespace)
+mixseg = worker()
+segment = c("米絲肉雞")
+new_user_word(mixseg,segment)
+```
+##做出相關性的指標 因為是一個講述歷史的粉絲專業所以以歷史為關鍵詞
+```{r  echo=TRUE}
+
+jieba_tokenizer=function(d){
+  unlist(segment(d[[1]],mixseg))
+}
+seg = lapply(docs, jieba_tokenizer)
+freqFrame = as.data.frame(table(unlist(seg)))
+
+d.corpus <- Corpus(VectorSource(seg))
+tdm <- TermDocumentMatrix(d.corpus, 
+                          control = list(wordLengths = c(1, Inf)))
+
+labor = findAssocs(tdm, "歷史", 0.6)
+labor
+```
+## 作tf-id 統計圖表
+```{r  echo=TRUE,warning=FALSE}
+N = tdm$ncol
+tf <- apply(tdm, 2, sum)
+idfCal <- function(word_doc)
+{ 
+  log2( N / nnzero(word_doc) ) 
+}
+idf <- apply(tdm, 1, idfCal)
+
+
+doc.tfidf <- as.matrix(tdm)
+for(x in 1:nrow(tdm))
+{
+  for(y in 1:ncol(tdm))
+  {
+    doc.tfidf[x,y] <- (doc.tfidf[x,y] / tf[y]) * idf[x]
+  }
+}
+topID = lapply(rownames(as.data.frame(labor)), function(x) 
+  which(rownames(tdm) == x))
+topID = unlist(topID)
+plot_ly(data = as.data.frame(doc.tfidf),
+        x = as.numeric(colnames(doc.tfidf)),
+        y = doc.tfidf[topID[24],], 
+        name = rownames(doc.tfidf)[topID[24]],
+        type = "scatter", mode= "box") %>%
+  add_trace(y = doc.tfidf[topID[25],],
+            name = rownames(doc.tfidf)[topID[25]])
+```
+# 尋找文章之間的相關性 用COS.sim
+```{r echo=TRUE,warning=FALSE}
+nonzero = (doc.tfidf != rep(0,10))
+nonzeroid = which(row_sums(nonzero) != 0)
+q <- rownames(doc.tfidf[nonzeroid,])
+all.term <- rownames(doc.tfidf)
+loc <- which(all.term %in% q)
+s.tdm <- doc.tfidf[loc,]
+
+cos.sim <- function(x, y)
+{ 
+  (as.vector(x) %*% as.vector(y)) / (norm(as.matrix(x)) * norm(y)) 
+}
+
+doc.cos <- apply(s.tdm[,1:100], 2, cos.sim,
+                 y=as.matrix(s.tdm[,100]))
+orderDoc <- doc.cos[order(doc.cos, decreasing = TRUE)]
+plot_ly(data = as.data.frame(orderDoc),
+        x = rownames(as.data.frame(orderDoc)),
+        y = orderDoc, 
+        name = rownames(doc.tfidf)[topID[1]],
+        type = "bar", mode= "box")
+```
+
+# 最後做K-means的圖表
+
+```{r echo=TRUE,warning=FALSE}
+set.seed(150)
+kmeansOut <- kmeans(doc.tfidf, 2, nstart = 50)
+plot(doc.tfidf, col =(kmeansOut$cluster +1) , main = "k-means result", pch=18, cex=2)
+testtfidf <- doc.tfidf
+tfidf.pca = prcomp(testtfidf)
+biplot(tfidf.pca,color=c(1,11))
+```
