@@ -5,6 +5,6 @@
 
 ●作業三 文字雲：https://ntu-csx-datascience.github.io/B04611027/hw3.html
 
-●作業四 TF-IDF & KMeans：
+●作業四 TF-IDF & KMeans：https://ntu-csx-datascience.github.io/B04611027/hw4.html
 
 ●作業五:
