@@ -1,0 +1,51 @@
+---
+title: "hw5"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+##匯入會使用到的LIBRARY e1071SVM用
+```{r echo=TRUE,warning=FALSE}
+library(e1071)
+library(dplyr)
+library(lattice)
+library(ggplot2)
+library(caret)
+```
+##這次使用R語言本身的兩種耐寒植物對二氧化碳攝取的差異影響
+
+```{r echo=TRUE,warning=FALSE}
+data =CO2%>%as.data.frame()
+plot(data)
+```
+###首先繪製以種類為底的散布圖
+```{r echo=TRUE,warning=FALSE}
+ggplot(data=CO2) +                        
+    geom_point(aes(x=conc,y=uptake,color=Type)) 
+```
+###再來是盒鬚圖
+```{r echo=TRUE,warning=FALSE}
+qplot(x=conc,y=uptake,data=CO2,geom="boxplot",color=Type)
+```
+###anova分析 測定
+```{r echo=TRUE,warning=FALSE}
+model1<-lm(conc~Type,data=CO2)
+anova(model1) 
+model2<- lm(uptake~Type,data=CO2)
+anova(model2)
+```
+###TRAINING 我們的DATA去預測TYPE
+```{r echo=TRUE,warning=FALSE}
+###資料有約莫98筆 我們拆半TRAINING 效果可能會較好
+test=sample(nrow(CO2),52, replace=FALSE)
+x <- subset(CO2[test,], select = -Type)
+y <- CO2$Type[test]
+training = CO2[-test,]
+svm_model1 = 
+  svmfit = svm(Type ~ ., data = CO2[-test,])
+pred = predict(svm_model1,x)
+confusionMatrix(pred,y)
+```
+### 準確率可達91% 因為有取用一項變異數為1的項 提升很多的準確度
